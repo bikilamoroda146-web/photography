@@ -162,4 +162,51 @@ export function updateBookingStatus(bookingId, status) {
   return updated
 }
 
+export function updateBookingDetails(bookingId, details) {
+  if (!details || typeof details !== 'object') throw new Error('Enter valid booking details.')
+  const fields = ['preferredDate', 'preferredTime', 'location', 'notes']
+  if (fields.some((field) => details[field] !== undefined && typeof details[field] !== 'string')) {
+    throw new Error('Enter valid booking details.')
+  }
+  const preferredDate = (details.preferredDate || '').trim()
+  const preferredTime = (details.preferredTime || '').trim()
+  const location = (details.location || '').trim()
+  const notes = (details.notes || '').trim()
+  const parsedDate = preferredDate && new Date(`${preferredDate}T00:00:00`)
+  if (preferredDate && (!/^\d{4}-\d{2}-\d{2}$/.test(preferredDate)
+    || Number.isNaN(parsedDate.getTime()) || parsedDate.toISOString().slice(0, 10) !== preferredDate)) {
+    throw new Error('Enter a valid session date.')
+  }
+  if (preferredTime && !/^([01]\d|2[0-3]):[0-5]\d$/.test(preferredTime)) throw new Error('Enter a valid preferred time.')
+  if (location.length > 500) throw new Error('Location must be 500 characters or fewer.')
+  if (notes.length > 2000) throw new Error('Studio notes must be 2,000 characters or fewer.')
+
+  const bookings = readBookings()
+  const booking = bookings.find((item) => item.id === bookingId)
+  if (!booking) throw new Error('This booking could not be found.')
+  const updatedFields = { preferredDate, preferredTime, location, notes }
+  const labels = {
+    preferredDate: 'session date',
+    preferredTime: 'preferred time',
+    location: 'location',
+    notes: 'studio notes',
+  }
+  const changedFields = Object.keys(updatedFields).filter((field) => (booking[field] || '') !== updatedFields[field])
+  if (!changedFields.length) return booking
+
+  const updated = {
+    ...booking,
+    ...updatedFields,
+    detailsHistory: [
+      ...(Array.isArray(booking.detailsHistory) ? booking.detailsHistory : []),
+      {
+        changedAt: new Date().toISOString(),
+        fields: changedFields.map((field) => labels[field]),
+      },
+    ],
+  }
+  writeBookings(bookings.map((item) => item.id === bookingId ? updated : item))
+  return updated
+}
+
 export const bookingEvents = { changed: BOOKINGS_CHANGED }

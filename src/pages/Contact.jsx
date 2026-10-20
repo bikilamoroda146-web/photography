@@ -27,7 +27,7 @@ export default function Contact() {
     try { createInquiry(f); setStatus('done') } catch (error) { setSubmitError(error.message || 'Your inquiry could not be saved.'); setStatus('error') }
   }
   return (<>
-    <Banner k="landscape" title="Let's Talk About Your Project." sub="Tell us what you have in mind." />
+    <Banner k="event" title="Let's Talk About Your Project." sub="Tell us what you have in mind." />
     <section className="mx-auto grid max-w-5xl gap-10 px-5 py-14 md:grid-cols-3 md:px-10">
       {(servicesError || settingsError) && <p role="alert" className="border border-red-800/30 bg-red-50 p-3 text-sm text-red-900 md:col-span-3">{servicesError || settingsError}</p>}
       <div><h2 className="mb-4 font-serif text-2xl">Get in Touch</h2><p className="text-sm text-muted">{settings.contactEmail || SITE.email}</p><p className="mt-2 text-sm text-muted">{settings.location || SITE.location}</p></div>

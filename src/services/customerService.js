@@ -48,7 +48,9 @@ function normalizeCustomer(value, email) {
 
 export function getDemoSession() {
   const session = readJson(SESSION_KEY, null)
-  return session && typeof session.email === 'string' && session.email.includes('@') ? session : null
+  if (!session || typeof session.email !== 'string' || !session.email.includes('@')
+    || (session.role && session.role !== 'customer')) return null
+  return { ...session, role: 'customer' }
 }
 
 export function startDemoSession(email) {
@@ -62,7 +64,7 @@ export function startDemoSession(email) {
     : null
   const customer = normalizeCustomer(customers[normalizedEmail] || legacy, normalizedEmail)
   writeJson(CUSTOMERS_KEY, { ...customers, [normalizedEmail]: customer })
-  writeJson(SESSION_KEY, { email: normalizedEmail })
+  writeJson(SESSION_KEY, { email: normalizedEmail, role: 'customer' })
   return customer
 }
 

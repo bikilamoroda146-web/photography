@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import {
-  ArrowDownUp, ArrowLeft, ArrowRight, CalendarDays, Check, Clock3, ImagePlus,
-  Mail, MapPin, Phone, Search, SlidersHorizontal,
+  ArrowDownUp, ArrowLeft, ArrowRight, CalendarDays, Check, Clock3, FileUp, ImagePlus,
+  Mail, MapPin, Phone, Search, SlidersHorizontal, Trash2,
 } from 'lucide-react'
 import { EMAIL_RE, Field, inputCls } from '../components/ui'
 import useBookings from '../hooks/useBookings'
@@ -13,6 +13,7 @@ import {
 import {
   endDemoSession, getCustomer, getDemoSession, getDemoSettings, saveCustomer, saveDemoSettings,
 } from '../services/customerService'
+import { prepareImageUpload } from '../utils/imageUpload'
 
 const STATUSES = ['Pending', 'Confirmed', 'Completed', 'Cancelled', 'Rejected']
 const now = new Date()
@@ -30,6 +31,31 @@ const submittedLabel = (value) => value
       : new Intl.DateTimeFormat('en', { year: 'numeric', month: 'short', day: 'numeric' }).format(date)
   })()
   : 'Date not available'
+
+function bookingUpdates(booking) {
+  const statuses = Array.isArray(booking.statusHistory) && booking.statusHistory.length
+    ? booking.statusHistory.map((entry, index) => ({
+      key: `status-${entry.changedAt}-${entry.status}`,
+      changedAt: entry.changedAt,
+      message: index === 0 && entry.status === 'Pending'
+        ? `Request submitted with status ${entry.status}.`
+        : `Status updated to ${entry.status}.`,
+    }))
+    : [{
+      key: `submitted-${booking.submittedAt}`,
+      changedAt: booking.submittedAt,
+      message: `Request submitted. Current status: ${booking.status}.`,
+    }]
+  const detailUpdates = (Array.isArray(booking.detailsHistory) ? booking.detailsHistory : []).map((entry, index) => ({
+    key: `details-${entry.changedAt}-${index}`,
+    changedAt: entry.changedAt,
+    message: (Array.isArray(entry.fields) ? entry.fields.filter((field) => typeof field === 'string') : []).length
+      ? `Booking details updated: ${entry.fields.filter((field) => typeof field === 'string').join(', ')}.`
+      : 'Booking details were updated.',
+  }))
+  return [...statuses, ...detailUpdates]
+    .sort((a, b) => new Date(b.changedAt).getTime() - new Date(a.changedAt).getTime())
+}
 
 function PageHeading({ eyebrow, title, children }) {
   return <div className="mb-8 border-b border-beige pb-6">
@@ -134,12 +160,15 @@ export function Dashboard() {
           </ul> : <p className="border-y border-beige py-6 text-sm text-muted">There are no upcoming sessions. You can review past and closed requests in My Bookings.</p>}
         </section>
         <section aria-labelledby="activity-heading">
-          <div className="mb-4 border-b border-beige pb-3"><h2 id="activity-heading" className="font-serif text-2xl text-char">Recent Activity</h2></div>
+          <div className="mb-4 border-b border-beige pb-3"><h2 id="activity-heading" className="font-serif text-2xl text-char">Recent Activity</h2><p className="mt-1 text-xs text-muted">Booking status and studio detail updates.</p></div>
           <ul className="divide-y divide-beige border-y border-beige">
-            {bookings.slice(0, 4).map((booking) => <li key={booking.id} className="flex gap-3 py-4">
-              <span className="mt-1 grid h-7 w-7 shrink-0 place-items-center border border-beige text-gold"><Clock3 aria-hidden="true" size={14} /></span>
-              <div><p className="text-sm text-char">{booking.status === 'Pending' ? 'Request submitted' : `Request ${booking.status.toLowerCase()}`} · {booking.service}</p><p className="mt-1 text-xs text-muted">{submittedLabel(booking.submittedAt)}</p></div>
-            </li>)}
+            {bookings.flatMap((booking) => bookingUpdates(booking).map((update) => ({ ...update, booking })))
+              .sort((a, b) => new Date(b.changedAt).getTime() - new Date(a.changedAt).getTime())
+              .slice(0, 5)
+              .map(({ booking, ...update }) => <li key={`${booking.id}-${update.key}`} className="flex gap-3 py-4">
+                <span className="mt-1 grid h-7 w-7 shrink-0 place-items-center border border-beige text-gold"><Clock3 aria-hidden="true" size={14} /></span>
+                <div><p className="text-sm text-char">{update.message} <span className="text-muted">· {booking.service}</span></p><p className="mt-1 text-xs text-muted">{submittedLabel(update.changedAt)}</p><Link to={`/dashboard/bookings/${booking.id}`} className="mt-1 inline-flex min-h-8 items-center text-[10px] uppercase tracking-wider hover:text-gold">View booking details<ArrowRight aria-hidden="true" size={12} /></Link></div>
+              </li>)}
           </ul>
         </section>
       </div>}
@@ -209,6 +238,11 @@ export function BookingDetails() {
       <Detail label="Location or venue" value={booking.location || 'To be discussed'} icon={<MapPin size={16} />} />
       <div className="border-y border-beige py-5 sm:col-span-2"><h2 className="text-[10px] uppercase tracking-[.16em] text-muted">Your message</h2><p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-char">{booking.message || 'No message provided.'}</p></div>
       <div className="border-b border-beige py-5 sm:col-span-2"><h2 className="text-[10px] uppercase tracking-[.16em] text-muted">Studio notes</h2><p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-char">{booking.notes || 'There are no additional notes for this request.'}</p></div>
+      <div className="border-b border-beige py-5 sm:col-span-2"><h2 className="text-[10px] uppercase tracking-[.16em] text-muted">Booking updates</h2>
+        {bookingUpdates(booking).length ? <ol className="mt-3 space-y-3">{bookingUpdates(booking).map((update) =>
+          <li key={update.key} className="border-l-2 border-gold pl-4"><p className="text-sm text-char">{update.message}</p><p className="mt-1 text-xs text-muted">{submittedLabel(update.changedAt)}</p></li>)}</ol>
+          : <p className="mt-2 text-sm text-muted">No updates have been recorded yet.</p>}
+      </div>
     </section>
     {booking.status === 'Pending' && <div className="mt-7 flex flex-wrap items-center gap-4"><button type="button" onClick={cancel} className="min-h-11 border border-char px-5 text-xs uppercase tracking-wider transition hover:bg-char hover:text-ivory">Cancel pending request</button><p className="text-xs text-muted">Only requests awaiting review can be cancelled.</p></div>}
     <div className="mt-8 border-l-2 border-gold bg-cream px-4 py-3 text-sm leading-6 text-muted">A request remains pending until the studio contacts you. This page does not confirm a session.</div>
@@ -291,7 +325,25 @@ export function Profile() {
   const [editing, setEditing] = useState(false)
   const [errors, setErrors] = useState({})
   const [feedback, setFeedback] = useState('')
+  const [imageLoading, setImageLoading] = useState(false)
   const set = (key) => (event) => setForm((current) => ({ ...current, [key]: event.target.value }))
+
+  async function selectProfileImage(event) {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+    setImageLoading(true)
+    setErrors((current) => ({ ...current, image: '' }))
+    try {
+      const image = await prepareImageUpload(file, 512)
+      setForm((current) => ({ ...current, image }))
+      setFeedback('')
+    } catch (imageError) {
+      setErrors((current) => ({ ...current, image: imageError.message || 'The selected image could not be processed.' }))
+    } finally {
+      setImageLoading(false)
+    }
+  }
 
   function save(event) {
     event.preventDefault()
@@ -302,9 +354,12 @@ export function Profile() {
     if (form.image.trim()) {
       try {
         const imageUrl = new URL(form.image.trim())
-        if (!['http:', 'https:'].includes(imageUrl.protocol)) nextErrors.image = 'Use a valid web image URL.'
+        if (!['http:', 'https:'].includes(imageUrl.protocol)
+          && !(imageUrl.protocol === 'data:' && /^data:image\/webp;base64,/i.test(form.image.trim()))) {
+          nextErrors.image = 'Choose an image or use a valid web image URL.'
+        }
       } catch {
-        nextErrors.image = 'Use a valid web image URL.'
+        nextErrors.image = 'Choose an image or use a valid web image URL.'
       }
     }
     setErrors(nextErrors)
@@ -344,8 +399,25 @@ export function Profile() {
       <Field id="profile-name" label="Full name" error={errors.name}><input id="profile-name" autoComplete="name" required className={inputCls} value={form.name} onChange={set('name')} aria-invalid={!!errors.name} /></Field>
       <Field id="profile-email" label="Email address" error={errors.email}><input id="profile-email" type="email" autoComplete="email" required className={inputCls} value={form.email} onChange={set('email')} aria-invalid={!!errors.email} /><span className="mt-1 block text-xs text-muted">Your demo sign-in email is not changed by editing this contact field.</span></Field>
       <Field id="profile-phone" label="Phone number (optional)"><input id="profile-phone" type="tel" autoComplete="tel" className={inputCls} value={form.phone || ''} onChange={set('phone')} /></Field>
-      <Field id="profile-image" label="Profile image URL (optional)" error={errors.image}><input id="profile-image" type="url" className={inputCls} value={form.image || ''} onChange={set('image')} placeholder="https://example.com/portrait.jpg" aria-invalid={!!errors.image} /></Field>
-      <div className="flex flex-wrap gap-3"><button type="submit" className="min-h-11 bg-char px-5 text-xs uppercase tracking-wider text-ivory hover:bg-dark">Save changes</button><button type="button" onClick={cancelEdit} className="min-h-11 border border-beige px-5 text-xs uppercase tracking-wider hover:border-char">Cancel editing</button></div>
+      <div>
+        <p className="mb-1 text-xs uppercase tracking-widest">Profile photo (optional)</p>
+        <div className="flex flex-wrap items-center gap-4">
+          {form.image ? <img src={form.image} alt="Profile photo preview" className="h-16 w-16 rounded-full border border-beige object-cover" /> : <span aria-hidden="true" className="grid h-16 w-16 place-items-center rounded-full border border-gold/50 bg-cream font-serif text-2xl text-char">{(form.name || 'C').charAt(0).toUpperCase()}</span>}
+          <div className="flex flex-wrap gap-2">
+            <label htmlFor="profile-image" className="inline-flex min-h-11 cursor-pointer items-center gap-2 border border-beige px-4 text-xs uppercase tracking-wider transition hover:border-gold">
+              <FileUp aria-hidden="true" size={15} />{imageLoading ? 'Preparing photo…' : 'Choose photo'}
+            </label>
+            <input id="profile-image" type="file" accept="image/jpeg,image/png,image/webp" onChange={selectProfileImage} disabled={imageLoading} className="sr-only" aria-describedby="profile-image-help" />
+            {form.image && <button type="button" onClick={() => { setForm((current) => ({ ...current, image: '' })); setErrors((current) => ({ ...current, image: '' })) }} className="inline-flex min-h-11 items-center gap-2 border border-beige px-4 text-xs uppercase tracking-wider transition hover:border-char"><Trash2 aria-hidden="true" size={14} />Remove</button>}
+          </div>
+        </div>
+        <p id="profile-image-help" className="mt-2 text-xs text-muted">JPEG, PNG, or WebP · up to 10 MB. Your photo is resized and saved in this browser.</p>
+        {errors.image && <p role="alert" className="mt-1 text-xs text-red-700">{errors.image}</p>}
+      </div>
+      <Field id="profile-image-url" label="Or use a profile image URL (optional)" error={errors.image}>
+        <input id="profile-image-url" type="url" className={inputCls} value={form.image?.startsWith('http') ? form.image : ''} onChange={set('image')} placeholder="https://example.com/portrait.jpg" aria-invalid={!!errors.image} />
+      </Field>
+      <div className="flex flex-wrap gap-3"><button type="submit" disabled={imageLoading} className="min-h-11 bg-char px-5 text-xs uppercase tracking-wider text-ivory hover:bg-dark disabled:cursor-wait disabled:opacity-60">Save changes</button><button type="button" onClick={cancelEdit} className="min-h-11 border border-beige px-5 text-xs uppercase tracking-wider hover:border-char">Cancel editing</button></div>
     </form>}
   </div>
 }

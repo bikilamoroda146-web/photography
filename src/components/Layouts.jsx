@@ -15,11 +15,11 @@ function Navbar() {
         <Link to="/" className="leading-none"><span className="font-serif text-2xl tracking-widest">SAMI</span><span className="block text-[8px] tracking-[.4em] text-beige">PHOTOGRAPHY</span></Link>
         <nav aria-label="Main" className="hidden gap-8 text-xs uppercase tracking-widest md:flex">
           {NAV.map(([p, l]) => <NavLink key={p} to={p} end className={link}>{l}</NavLink>)}</nav>
-        <div className="hidden items-center gap-5 md:flex"><Link to="/signin" className="text-xs uppercase tracking-widest hover:text-gold">Sign In</Link><Button to="/contact?service=Portrait%20Photography">Book a Session</Button></div>
+        <div className="hidden items-center gap-5 md:flex"><Link to="/signin" className="text-xs uppercase tracking-widest hover:text-gold">Sign In</Link><Link to="/admin/signin" className="text-[10px] uppercase tracking-wider text-beige hover:text-gold">Studio Admin</Link><Button to="/contact?service=Portrait%20Photography">Book a Session</Button></div>
         <button type="button" className="-mr-2 p-2 md:hidden" aria-expanded={open} aria-label="Toggle menu" onClick={() => setOpen(!open)}>{open ? <X /> : <Menu />}</button>
       </div>
       {open && <div className="fade bg-rich/95 px-5 pb-6 md:hidden">
-        {[...NAV, ['/signin', 'Sign In']].map(([p, l]) => <Link key={p} to={p} onClick={() => setOpen(false)} className="block border-b border-white/10 py-3 text-sm uppercase tracking-widest">{l}</Link>)}</div>}
+        {[...NAV, ['/signin', 'Sign In'], ['/admin/signin', 'Studio Admin']].map(([p, l]) => <Link key={p} to={p} onClick={() => setOpen(false)} className="block border-b border-white/10 py-3 text-sm uppercase tracking-widest">{l}</Link>)}</div>}
     </header>)
 }
 function Footer() {
@@ -69,7 +69,7 @@ export function DashboardLayout() {
   } catch (storageError) {
     return <main className="grid min-h-screen place-items-center px-5 text-center"><div><h1 className="font-serif text-2xl">Customer demo unavailable</h1><p role="alert" className="mt-3 max-w-md text-sm leading-6 text-muted">{storageError.message}</p><Link to="/" className="mt-5 inline-block text-xs uppercase tracking-wider underline underline-offset-4">Return to the public site</Link></div></main>
   }
-  if (!session) return <Navigate to="/signin" replace state={{ from: location.pathname }} />
+  if (!session || session.role !== 'customer') return <Navigate to="/signin" replace state={{ from: location.pathname }} />
   let customer
   try {
     customer = getCustomer(session.email)
@@ -101,7 +101,7 @@ export function DashboardLayout() {
             <button type="button" className="rounded-sm p-1 text-beige hover:text-ivory focus-visible:outline md:hidden" aria-label="Close navigation menu" onClick={() => setOpen(false)}><X size={18} /></button></div>
         </div>
         <div className="border-b border-white/10 px-5 py-5">
-          <span className="grid h-10 w-10 place-items-center rounded-full border border-gold/50 bg-white/5 font-serif text-lg text-gold">{(customer.name || 'C').charAt(0).toUpperCase()}</span>
+          {customer.image ? <img src={customer.image} alt="" className="h-10 w-10 rounded-full border border-gold/50 object-cover" /> : <span className="grid h-10 w-10 place-items-center rounded-full border border-gold/50 bg-white/5 font-serif text-lg text-gold">{(customer.name || 'C').charAt(0).toUpperCase()}</span>}
           <p className="mt-3 truncate text-sm font-medium">{customer.name}</p><p className="mt-1 truncate text-xs text-beige">{session.email}</p>
         </div>
         <nav aria-label="Customer dashboard" className="flex-1 space-y-1 px-3 py-5">
@@ -128,7 +128,7 @@ export function DashboardLayout() {
             <button ref={menuButton} type="button" className="grid h-10 w-10 place-items-center border border-beige text-char hover:border-gold md:hidden" aria-label="Open navigation menu" aria-expanded={open} aria-controls="customer-navigation" onClick={() => setOpen(true)}><Menu size={19} /></button>
             <span className="text-[10px] uppercase tracking-[.18em] text-muted">Customer dashboard</span>
           </div>
-          <Link to="/dashboard/profile" className="flex min-h-10 items-center gap-2 text-xs text-char hover:text-gold"><span className="grid h-8 w-8 place-items-center rounded-full border border-beige font-serif">{(customer.name || 'C').charAt(0).toUpperCase()}</span><span className="hidden sm:inline">{customer.name}</span></Link>
+          <Link to="/dashboard/profile" className="flex min-h-10 items-center gap-2 text-xs text-char hover:text-gold">{customer.image ? <img src={customer.image} alt="" className="h-8 w-8 rounded-full border border-beige object-cover" /> : <span className="grid h-8 w-8 place-items-center rounded-full border border-beige font-serif">{(customer.name || 'C').charAt(0).toUpperCase()}</span>}<span className="hidden sm:inline">{customer.name}</span></Link>
         </header>
         <main className="fade mx-auto w-full max-w-[1440px] px-4 py-7 sm:px-7 sm:py-9 lg:px-10 lg:py-10">
           <p className="mb-7 border-l-2 border-gold bg-cream px-3 py-2 text-xs leading-5 text-muted">Frontend demo only · This account and its bookings are stored in this browser. This is not secure authentication.</p>

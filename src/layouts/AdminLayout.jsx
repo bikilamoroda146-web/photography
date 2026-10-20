@@ -1,25 +1,30 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, NavLink, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
-  BriefcaseBusiness, CalendarDays, ChevronLeft, ChevronRight, Image, LayoutDashboard,
-  LogOut, Mail, Menu, Settings, Users, X,
+  Bell, BriefcaseBusiness, CalendarDays, ChevronLeft, ChevronRight, CloudUpload, Image,
+  LayoutDashboard, LogOut, Mail, Menu, Search, Settings, Tags, Users, X,
 } from 'lucide-react'
 import { endDemoAdminSession, getDemoAdminSession } from '../services/adminSessionService'
 
 const navigation = [
   { to: '/admin', label: 'Overview', icon: LayoutDashboard, end: true },
+  { to: '/admin/photos', label: 'Photo Gallery', icon: Image },
+  { to: '/admin/upload', label: 'Upload Photos', icon: CloudUpload },
+  { to: '/admin/categories', label: 'Categories', icon: Tags },
+  { to: '/admin/products', label: 'Products & services', icon: BriefcaseBusiness },
+  { to: '/admin/inquiries', label: 'Customer Inquiries', icon: Mail },
+  { to: '/admin/settings', label: 'Settings', icon: Settings },
+]
+const businessNavigation = [
   { to: '/admin/bookings', label: 'Bookings', icon: CalendarDays },
   { to: '/admin/customers', label: 'Customers', icon: Users },
-  { to: '/admin/services', label: 'Services', icon: BriefcaseBusiness },
-  { to: '/admin/portfolio', label: 'Portfolio', icon: Image },
-  { to: '/admin/inquiries', label: 'Inquiries', icon: Mail },
-  { to: '/admin/settings', label: 'Settings', icon: Settings },
 ]
 
 export default function AdminLayout() {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [collapsed, setCollapsed] = useState(false)
   const [signOutError, setSignOutError] = useState('')
+  const [adminSearch, setAdminSearch] = useState('')
   const openButton = useRef(null)
   const sidebar = useRef(null)
   const drawerWasOpen = useRef(false)
@@ -72,7 +77,7 @@ export default function AdminLayout() {
     <p role="alert" className="mt-3 text-sm leading-6 text-muted">{sessionError}</p>
     <Link to="/" className="mt-5 inline-block min-h-10 pt-2 text-xs uppercase tracking-wider underline underline-offset-4">Return to the public site</Link>
   </div></main>
-  if (!session) return <Navigate to="/admin/signin" replace state={{ from: location.pathname }} />
+  if (!session || session.role !== 'admin') return <Navigate to="/admin/signin" replace state={{ from: location.pathname }} />
 
   function signOut() {
     if (!window.confirm('Sign out of this simulated admin session?')) return
@@ -101,6 +106,11 @@ export default function AdminLayout() {
           className={({ isActive }) => `flex min-h-11 items-center gap-3 border-l-2 px-3 text-sm transition ${collapsed ? 'md:justify-center md:px-2' : ''} ${isActive ? 'border-gold bg-white/[.07] text-gold' : 'border-transparent text-beige hover:bg-white/[.04] hover:text-ivory'}`}>
           <Icon aria-hidden="true" size={17} strokeWidth={1.6} /><span className={collapsed ? 'md:sr-only' : ''}>{label}</span>
         </NavLink>)}
+        <p className={`mb-2 mt-7 border-t border-white/10 px-3 pb-1 pt-5 text-[9px] uppercase tracking-[.2em] text-muted ${collapsed ? 'md:sr-only' : ''}`}>Business</p>
+        {businessNavigation.map(({ to, label, icon: Icon }) => <NavLink key={to} to={to} title={collapsed ? label : undefined}
+          className={({ isActive }) => `flex min-h-11 items-center gap-3 border-l-2 px-3 text-sm transition ${collapsed ? 'md:justify-center md:px-2' : ''} ${isActive ? 'border-gold bg-white/[.07] text-gold' : 'border-transparent text-beige hover:bg-white/[.04] hover:text-ivory'}`}>
+          <Icon aria-hidden="true" size={17} strokeWidth={1.6} /><span className={collapsed ? 'md:sr-only' : ''}>{label}</span>
+        </NavLink>)}
       </nav>
       <div className="border-t border-white/10 px-3 py-4">
         {signOutError && <p role="alert" className={`mb-3 px-3 text-xs text-red-200 ${collapsed ? 'md:sr-only' : ''}`}>{signOutError}</p>}
@@ -113,18 +123,23 @@ export default function AdminLayout() {
       </div>
     </aside>
     <div className="min-w-0 flex-1">
-      <header className="sticky top-0 z-30 flex min-h-16 items-center justify-between border-b border-beige bg-ivory/95 px-4 backdrop-blur sm:px-7 lg:px-10">
+      <header className="sticky top-0 z-30 flex min-h-16 items-center justify-between gap-4 border-b border-[#E5DED2] bg-[#FAF8F3]/95 px-4 backdrop-blur sm:px-7 lg:px-10">
         <div className="flex items-center gap-3">
           <button ref={openButton} type="button" className="grid h-10 w-10 place-items-center border border-beige text-char hover:border-gold md:hidden" aria-label="Open admin navigation" aria-expanded={mobileOpen} aria-controls="admin-navigation" onClick={() => setMobileOpen(true)}><Menu size={19} /></button>
-          <span className="text-[10px] uppercase tracking-[.18em] text-muted">Business administration</span>
+          <div className="min-w-0"><p className="truncate text-[8px] uppercase tracking-[.2em] text-[#947346]">Sami Photography</p><p className="truncate text-xs font-medium text-char sm:text-sm">{navigation.find((item) => item.to === location.pathname)?.label || businessNavigation.find((item) => item.to === location.pathname)?.label || 'Studio administration'}</p></div>
         </div>
-        <Link to="/" className="min-h-10 content-center text-xs text-char hover:text-gold">View public site</Link>
+        <div className="flex min-w-0 flex-1 items-center justify-end gap-2 sm:gap-4">
+          <label className="relative hidden w-full max-w-xs md:block"><span className="sr-only">Search photos</span><Search aria-hidden="true" size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" /><input value={adminSearch} onChange={(event) => setAdminSearch(event.target.value)} placeholder="Search your photos…" className="min-h-10 w-full border border-[#E5DED2] bg-white/70 pl-9 pr-3 text-xs text-char placeholder:text-muted/70 focus:border-[#B49668]" /></label>
+          <button type="button" disabled aria-label="Notifications, preview only" title="Notifications are not connected" className="relative grid h-10 w-10 shrink-0 place-items-center border border-[#E5DED2] bg-white/60 text-char opacity-80"><Bell size={16} /><span aria-hidden="true" className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-[#B8874E] ring-2 ring-white" /></button>
+          <div className="flex shrink-0 items-center gap-2 border-l border-[#E5DED2] pl-3 sm:pl-4"><span className="grid h-8 w-8 place-items-center rounded-full bg-char font-serif text-sm text-[#E7D6B7]">S</span><span className="hidden sm:block"><span className="block text-xs font-medium text-char">Studio Admin</span><span className="block text-[9px] text-muted">Administrator</span></span></div>
+          <Link to="/" className="hidden min-h-10 items-center border-l border-[#E5DED2] pl-4 text-[10px] uppercase tracking-wider text-char hover:text-gold lg:flex">View site</Link>
+        </div>
       </header>
       <main className="mx-auto w-full max-w-[1500px] px-4 py-6 sm:px-7 sm:py-8 lg:px-10 lg:py-9">
         <p className="mb-7 border-l-2 border-gold bg-cream px-3 py-2 text-xs leading-5 text-muted">
-          Frontend demo only · Admin session and records are stored in this browser. This is not secure authorization; production access must be enforced by a backend.
+          Frontend demo only · Admin sessions and photo changes are stored in this browser, not shared or secure authorization. Uploaded image files use browser storage.
         </p>
-        <Outlet />
+        <Outlet context={{ pathname: location.pathname, adminSearch, setAdminSearch }} />
       </main>
     </div>
   </div>

@@ -12,6 +12,7 @@ import {
 } from './pages/Customer'
 import AdminLayout from './layouts/AdminLayout'
 import AdminSignIn from './pages/admin/AdminSignIn'
+import PhotoStudio from './pages/admin/PhotoStudio'
 import {
   AdminBookingDetails, AdminBookings, AdminCustomers, AdminInquiries,
   AdminOverview, AdminPortfolio, AdminServices, AdminSettings,
@@ -36,6 +37,11 @@ export default function App() {
       <Route path="/admin/signin" element={<AdminSignIn />} />
       <Route path="/admin" element={<AdminLayout />}>
         <Route index element={<AdminOverview />} />
+        <Route path="photos" element={<PhotoStudio />} />
+        <Route path="upload" element={<PhotoStudio />} />
+        <Route path="categories" element={<PhotoStudio />} />
+        <Route path="business-overview" element={<AdminOverview />} />
+        <Route path="products" element={<AdminServices />} />
         <Route path="bookings" element={<AdminBookings />} />
         <Route path="bookings/:bookingId" element={<AdminBookingDetails />} />
         <Route path="customers" element={<AdminCustomers />} />

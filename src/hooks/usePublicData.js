@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { DEMO_DATA_CHANGED } from '../services/demoStorage'
-import { getPortfolioProjects } from '../services/portfolioService'
+import { usePhotoLibrary } from './usePhotoLibrary'
 import { getServices } from '../services/serviceService'
 import { getAdminSettings } from '../services/adminSettingsService'
+import { isUploadedImage } from '../utils/imageUpload'
 
 function usePublicRecords(loader, publishedOnly = false) {
   const [records, setRecords] = useState([])
@@ -28,7 +29,6 @@ function usePublicRecords(loader, publishedOnly = false) {
 }
 
 const loadServices = () => getServices({ includeInactive: false })
-const loadProjects = (publishedOnly) => getPortfolioProjects({ publishedOnly })
 
 export function usePublicServices() {
   const { records, error } = usePublicRecords(loadServices)
@@ -36,8 +36,8 @@ export function usePublicServices() {
     services: records.map((service) => ({
       name: service.name,
       text: service.description,
-      k: ['portrait', 'wedding', 'event', 'landscape', 'product', 'studio'].includes(service.imageRef) ? service.imageRef : 'studio',
-      img: /^https?:\/\//i.test(service.imageRef) ? service.imageRef : '',
+      k: ['portrait', 'wedding', 'event', 'landscape', 'product', 'studio', 'graphic', 'graphicDesigner', 'worship'].includes(service.imageRef) ? service.imageRef : 'studio',
+      img: /^https?:\/\//i.test(service.imageRef) || isUploadedImage(service.imageRef) ? service.imageRef : '',
       id: service.id,
     })),
     error,
@@ -45,19 +45,20 @@ export function usePublicServices() {
 }
 
 export function usePublicProjects(publishedOnly = true) {
-  const { records, error } = usePublicRecords(loadProjects, publishedOnly)
+  const { photos, error, loading } = usePhotoLibrary(publishedOnly)
   return {
-    projects: records.map((project) => ({
+    projects: photos.map((project) => ({
       id: project.id,
       title: project.title,
       cat: project.category,
       k: project.imageRef,
-      img: project.imageUrl,
+      img: project.src,
       desc: project.description,
       published: project.published,
       ratio: 'aspect-[4/3]',
     })),
     error,
+    loading,
   }
 }
 

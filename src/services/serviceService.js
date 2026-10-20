@@ -1,4 +1,5 @@
 import { readStored, writeStored, createDemoId } from './demoStorage'
+import { isUploadedImage } from '../utils/imageUpload'
 
 const SERVICES_KEY = 'sami_demo_services_v1'
 export const SERVICE_CATEGORIES = [
@@ -19,7 +20,7 @@ const defaultServices = [
   ['Landscape Photography', 'Landscape and location photography for personal or creative projects.', 'landscape'],
   ['Product Photography', 'Product imagery for brands, makers and businesses.', 'product'],
   ['Video Production & Editing', 'Video production and post-production for stories and projects.', 'studio'],
-  ['Graphic Design', 'Visual design for creative and business communication.', 'product'],
+  ['Graphic Design', 'Visual design for creative and business communication.', 'graphic'],
   ['Other Digital Services', 'Digital creative services tailored to your project.', 'event'],
 ].map(([name, description, imageKey], index) => ({
   id: `service-${index + 1}`,
@@ -28,6 +29,7 @@ const defaultServices = [
   imageRef: imageKey,
   active: true,
 }))
+const defaultGraphicDesignService = defaultServices.find((service) => service.name === 'Graphic Design')
 
 const validServices = (value) => Array.isArray(value) && value.every((item) => item
   && typeof item.id === 'string' && typeof item.name === 'string'
@@ -36,7 +38,15 @@ const validServices = (value) => Array.isArray(value) && value.every((item) => i
 
 export function getServices({ includeInactive = true } = {}) {
   const services = readStored(SERVICES_KEY, defaultServices, validServices)
-  return (includeInactive ? services : services.filter((service) => service.active))
+  const updatedServices = services.map((service) => (
+    service.id === defaultGraphicDesignService.id
+      && service.name === defaultGraphicDesignService.name
+      && service.description === defaultGraphicDesignService.description
+      && service.imageRef === 'product'
+      ? { ...service, imageRef: defaultGraphicDesignService.imageRef }
+      : service
+  ))
+  return (includeInactive ? updatedServices : updatedServices.filter((service) => service.active))
     .slice().sort((a, b) => a.name.localeCompare(b.name))
 }
 
@@ -47,7 +57,7 @@ export function saveService(service) {
   }
   const services = getServices()
   const imageRef = typeof service.imageRef === 'string' ? service.imageRef.trim() : ''
-  if (/^https?:\/\//i.test(imageRef)) {
+  if (!isUploadedImage(imageRef) && /^https?:\/\//i.test(imageRef)) {
     let imageUrl
     try {
       imageUrl = new URL(imageRef)

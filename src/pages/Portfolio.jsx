@@ -18,7 +18,7 @@ export default function Portfolio() {
     return () => window.removeEventListener('keydown', onKey)
   })
   return (<>
-    <Banner k="landscape" title="Our Portfolio" sub="A collection of moments, places and stories." />
+    <Banner k="event" title="Our Portfolio" sub="A collection of moments, places and stories." />
     <section className="mx-auto max-w-7xl px-5 py-12 md:px-10">
       {(settingsError || error) && <p role="alert" className="mb-5 border border-red-800/30 bg-red-50 p-3 text-sm text-red-900">{settingsError || error}</p>}
       {!settings.showPortfolio ? <p className="py-10 text-center text-muted">The portfolio is not currently displayed.</p> : <>
@@ -29,7 +29,7 @@ export default function Portfolio() {
     </section>
     {cur && <div role="dialog" aria-modal="true" aria-label={cur.title} className="fade fixed inset-0 z-50 flex flex-col items-center justify-center bg-rich/95 p-4">
       <button type="button" autoFocus aria-label="Close" onClick={() => setOpenId(null)} className="absolute right-4 top-4 p-2 text-3xl text-ivory">✕</button>
-      <div className="aspect-[4/3] max-h-[65vh] w-full max-w-xl overflow-hidden"><Ph k={cur.k} img={cur.img} label={cur.title} /></div>
+      <div className="aspect-[4/3] max-h-[65vh] w-full max-w-xl overflow-hidden"><Ph k={cur.k} img={cur.img} label={`${cur.title}: ${cur.desc}`} /></div>
       <div className="mt-5 text-center text-ivory"><p className="text-[10px] uppercase tracking-widest text-gold">{cur.cat}</p><p className="font-serif text-2xl">{cur.title}</p><p className="text-sm text-beige">{cur.desc}</p></div>
       <div className="mt-5 flex gap-4">{[['‹ Prev', -1], ['Next ›', 1]].map(([l, d]) => <button type="button" key={l} onClick={() => step(d)} className="border border-white/30 px-5 py-3 text-xs uppercase tracking-widest text-ivory">{l}</button>)}</div>
     </div>}
