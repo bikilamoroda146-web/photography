@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, NavLink, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
-  Bell, BriefcaseBusiness, CalendarDays, ChevronLeft, ChevronRight, CloudUpload, Image,
+  Bell, BriefcaseBusiness, CalendarDays, ChevronLeft, ChevronRight, CloudUpload, ExternalLink, Image,
   LayoutDashboard, LogOut, Mail, Menu, Search, Settings, Tags, Users, X,
 } from 'lucide-react'
 import { endDemoAdminSession, getDemoAdminSession } from '../services/adminSessionService'
@@ -114,6 +114,9 @@ export default function AdminLayout() {
       </nav>
       <div className="border-t border-white/10 px-3 py-4">
         {signOutError && <p role="alert" className={`mb-3 px-3 text-xs text-red-200 ${collapsed ? 'md:sr-only' : ''}`}>{signOutError}</p>}
+        <Link to="/" title={collapsed ? 'View public website' : undefined} className={`flex min-h-11 items-center gap-3 border-l-2 border-transparent px-3 text-sm text-beige transition hover:bg-white/[.04] hover:text-ivory ${collapsed ? 'md:justify-center md:px-2' : ''}`}>
+          <ExternalLink aria-hidden="true" size={17} strokeWidth={1.6} /><span className={collapsed ? 'md:sr-only' : ''}>View Public Website</span>
+        </Link>
         <button type="button" onClick={signOut} title={collapsed ? 'Sign out' : undefined} className={`flex min-h-11 w-full items-center gap-3 border-l-2 border-transparent px-3 text-sm text-beige transition hover:bg-white/[.04] hover:text-ivory ${collapsed ? 'md:justify-center md:px-2' : ''}`}>
           <LogOut aria-hidden="true" size={17} strokeWidth={1.6} /><span className={collapsed ? 'md:sr-only' : ''}>Sign Out</span>
         </button>
@@ -137,7 +140,7 @@ export default function AdminLayout() {
       </header>
       <main className="mx-auto w-full max-w-[1500px] px-4 py-6 sm:px-7 sm:py-8 lg:px-10 lg:py-9">
         <p className="mb-7 border-l-2 border-gold bg-cream px-3 py-2 text-xs leading-5 text-muted">
-          Frontend demo only · Admin sessions and photo changes are stored in this browser, not shared or secure authorization. Uploaded image files use browser storage.
+          Frontend demo only · Admin sessions and photo changes are stored in this browser and are not shared with other visitors or devices. Uploaded image files use browser storage. Shared online updates require a backend or online storage; this demo is not secure authorization.
         </p>
         <Outlet context={{ pathname: location.pathname, adminSearch, setAdminSearch }} />
       </main>

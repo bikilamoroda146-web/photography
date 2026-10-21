@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom'
 import { Banner, Button, Gallery, Label, Ph } from '../components/ui'
 import { usePublicProjects, usePublicServices, usePublicSettings } from '../hooks/usePublicData'
 export default function Home() {
-  const { projects, error: projectError } = usePublicProjects()
+  const { projects, error: projectError, loading: projectsLoading } = usePublicProjects()
   const { services, error: servicesError } = usePublicServices()
   const { settings, error: settingsError } = usePublicSettings()
   return (<>
@@ -11,7 +11,9 @@ export default function Home() {
     {settings.showPortfolio && <section className="mx-auto max-w-7xl px-5 py-20 md:px-10">
       <div className="mb-10 flex items-end justify-between"><div><Label>Featured Portfolio</Label><h2 className="font-serif text-3xl md:text-4xl">Real moments. Authentic stories.</h2></div>
         <Link to="/portfolio" className="text-xs uppercase tracking-widest hover:text-gold">View All Projects →</Link></div>
-      {projectError ? <p role="alert" className="border border-red-800/30 bg-red-50 p-4 text-sm text-red-900">{projectError}</p> : <Gallery items={projects.slice(0, 4)} onOpen={() => {}} />}
+      {projectError ? <p role="alert" className="border border-red-800/30 bg-red-50 p-4 text-sm text-red-900">{projectError}</p>
+        : projectsLoading ? <p role="status" className="border border-beige bg-cream/50 p-6 text-sm text-muted">Loading featured photographs…</p>
+          : <Gallery items={projects.slice(0, 4)} onOpen={() => {}} />}
     </section>}
     {settings.showServices && <section className="bg-char py-20 text-ivory"><div className="mx-auto max-w-7xl px-5 md:px-10">
       <Label>Services</Label><h2 className="mb-10 font-serif text-3xl md:text-4xl">More than just photos.</h2>

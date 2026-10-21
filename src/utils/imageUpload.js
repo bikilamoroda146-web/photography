@@ -3,7 +3,7 @@ const MAX_IMAGE_FILE_SIZE = 10 * 1024 * 1024
 
 export const isUploadedImage = (value) => /^data:image\/webp;base64,/i.test(value)
 
-export async function prepareImageUpload(file, maxDimension = 1200) {
+async function resizeImageUpload(file, maxDimension) {
   if (!SUPPORTED_IMAGE_TYPES.includes(file.type)) {
     throw new Error('Choose a JPEG, PNG, or WebP image.')
   }
@@ -29,15 +29,24 @@ export async function prepareImageUpload(file, maxDimension = 1200) {
         else reject(new Error('The selected image could not be processed.'))
       }, 'image/webp', 0.8)
     })
-    return await new Promise((resolve, reject) => {
-      const reader = new FileReader()
-      reader.onload = () => typeof reader.result === 'string'
-        ? resolve(reader.result)
-        : reject(new Error('The selected image could not be read.'))
-      reader.onerror = () => reject(new Error('The selected image could not be read.'))
-      reader.readAsDataURL(blob)
-    })
+    return blob
   } finally {
     bitmap.close()
   }
+}
+
+export async function prepareImageUpload(file, maxDimension = 1200) {
+  const blob = await resizeImageUpload(file, maxDimension)
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => typeof reader.result === 'string'
+      ? resolve(reader.result)
+      : reject(new Error('The selected image could not be read.'))
+    reader.onerror = () => reject(new Error('The selected image could not be read.'))
+    reader.readAsDataURL(blob)
+  })
+}
+
+export function prepareImageUploadBlob(file, maxDimension = 512) {
+  return resizeImageUpload(file, maxDimension)
 }

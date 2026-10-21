@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { useEffect, useMemo, useState } from 'react'
+import { Link, useLocation, useParams } from 'react-router-dom'
 import {
   ArrowDownUp, ArrowLeft, ArrowRight, CalendarDays, Check, Clock3, FileUp, ImagePlus,
   Mail, MapPin, Phone, Search, SlidersHorizontal, Trash2,
@@ -13,7 +13,10 @@ import {
 import {
   endDemoSession, getCustomer, getDemoSession, getDemoSettings, saveCustomer, saveDemoSettings,
 } from '../services/customerService'
-import { prepareImageUpload } from '../utils/imageUpload'
+import { prepareImageUploadBlob } from '../utils/imageUpload'
+import { deleteCustomerImage, saveCustomerImage } from '../services/customerImageService'
+import { useCustomerAvatar } from '../hooks/useCustomerAvatar'
+import CustomerAvatar from '../components/CustomerAvatar'
 
 const STATUSES = ['Pending', 'Confirmed', 'Completed', 'Cancelled', 'Rejected']
 const now = new Date()
@@ -319,14 +322,40 @@ export function BookSession() {
 }
 
 export function Profile() {
+  const location = useLocation()
   const session = getDemoSession()
   const savedCustomer = getCustomer(session.email)
   const [form, setForm] = useState(savedCustomer)
-  const [editing, setEditing] = useState(false)
+  const [selectedImage, setSelectedImage] = useState(null)
+  const [removeStoredImage, setRemoveStoredImage] = useState(false)
+  const [editing, setEditing] = useState(() => location.state?.editProfile === true)
   const [errors, setErrors] = useState({})
   const [feedback, setFeedback] = useState('')
   const [imageLoading, setImageLoading] = useState(false)
+  const avatar = useCustomerAvatar(session.email)
+  const [imagePreview, setImagePreview] = useState('')
+  useEffect(() => {
+    if (location.state?.editProfile) setEditing(true)
+  }, [location.state])
+  useEffect(() => {
+    if (!selectedImage) {
+      setImagePreview('')
+      return undefined
+    }
+    const url = URL.createObjectURL(selectedImage)
+    setImagePreview(url)
+    return () => URL.revokeObjectURL(url)
+  }, [selectedImage])
+  const shownImage = selectedImage
+    ? imagePreview
+    : form.image || (removeStoredImage ? '' : avatar.src)
   const set = (key) => (event) => setForm((current) => ({ ...current, [key]: event.target.value }))
+  function setProfileImageUrl(event) {
+    setSelectedImage(null)
+    setRemoveStoredImage(false)
+    setForm((current) => ({ ...current, image: event.target.value }))
+    setErrors((current) => ({ ...current, image: '' }))
+  }
 
   async function selectProfileImage(event) {
     const file = event.target.files?.[0]
@@ -335,8 +364,10 @@ export function Profile() {
     setImageLoading(true)
     setErrors((current) => ({ ...current, image: '' }))
     try {
-      const image = await prepareImageUpload(file, 512)
-      setForm((current) => ({ ...current, image }))
+      const image = await prepareImageUploadBlob(file, 512)
+      setSelectedImage(image)
+      setRemoveStoredImage(false)
+      setForm((current) => ({ ...current, image: '' }))
       setFeedback('')
     } catch (imageError) {
       setErrors((current) => ({ ...current, image: imageError.message || 'The selected image could not be processed.' }))
@@ -345,7 +376,7 @@ export function Profile() {
     }
   }
 
-  function save(event) {
+  async function save(event) {
     event.preventDefault()
     const nextErrors = {}
     if (!form.name.trim()) nextErrors.name = 'Please enter your full name.'
@@ -365,18 +396,50 @@ export function Profile() {
     setErrors(nextErrors)
     setFeedback('')
     if (Object.keys(nextErrors).length) return
+    let newImageId = ''
     try {
-      saveCustomer(session.email, { name: form.name.trim(), email: form.email.trim(), phone: form.phone.trim(), image: form.image.trim() })
-      setForm({ ...form, name: form.name.trim(), phone: form.phone.trim(), image: form.image.trim() })
+      const currentCustomer = getCustomer(session.email)
+      if (selectedImage) newImageId = await saveCustomerImage(selectedImage)
+      const imageId = selectedImage
+        ? newImageId
+        : removeStoredImage || form.image.trim()
+          ? ''
+          : currentCustomer.imageId
+      saveCustomer(session.email, {
+        name: form.name.trim(),
+        email: form.email.trim(),
+        phone: form.phone.trim(),
+        image: form.image.trim(),
+        imageId,
+      })
+      if (currentCustomer.imageId && currentCustomer.imageId !== imageId) {
+        try {
+          await deleteCustomerImage(currentCustomer.imageId)
+        } catch (cleanupError) {
+          console.error('Profile saved, but the previous profile image could not be removed.', cleanupError)
+        }
+      }
+      setSelectedImage(null)
+      setRemoveStoredImage(false)
+      setForm(getCustomer(session.email))
       setEditing(false)
-      setFeedback('Your profile changes have been saved in this browser.')
+      setFeedback('Your profile changes have been saved in this browser. The updated avatar is visible across your account.')
     } catch (saveError) {
+      if (newImageId) {
+        try {
+          await deleteCustomerImage(newImageId)
+        } catch (cleanupError) {
+          console.error('Unable to remove an unsaved profile image.', cleanupError)
+        }
+      }
       setErrors({ form: saveError.message || 'Your profile could not be saved.' })
     }
   }
 
   function cancelEdit() {
     setForm(getCustomer(session.email))
+    setSelectedImage(null)
+    setRemoveStoredImage(false)
     setErrors({})
     setFeedback('')
     setEditing(false)
@@ -385,9 +448,12 @@ export function Profile() {
   return <div className="max-w-2xl">
     <PageHeading eyebrow="Your account" title="My Profile">Keep your contact details up to date so the studio can follow up on your requests.</PageHeading>
     <div className="mb-6 flex items-center gap-4 border-b border-beige pb-6">
-      {form.image ? <img src={form.image} alt="" className="h-16 w-16 rounded-full border border-beige object-cover" /> : <span aria-hidden="true" className="grid h-16 w-16 place-items-center rounded-full border border-gold/50 bg-cream font-serif text-2xl text-char">{(form.name || 'C').charAt(0).toUpperCase()}</span>}
+      <button type="button" onClick={() => { setEditing(true); setFeedback('') }} aria-label="Edit your profile and profile photo" className="cursor-pointer rounded-full transition hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-gold focus-visible:outline-offset-2">
+        <CustomerAvatar email={session.email} name={form.name} imageSrc={shownImage || ''} className="h-16 w-16 bg-cream text-2xl text-char" />
+      </button>
       <div><p className="font-serif text-xl text-char">{form.name}</p><p className="text-sm text-muted">{form.email}</p></div>
     </div>
+    {avatar.error && <div className="mb-5"><Feedback error>{avatar.error}</Feedback></div>}
     {feedback && <div className="mb-5"><Feedback>{feedback}</Feedback></div>}
     {errors.form && <div className="mb-5"><Feedback error>{errors.form}</Feedback></div>}
     {!editing ? <div className="space-y-4">
@@ -397,25 +463,30 @@ export function Profile() {
       <button type="button" onClick={() => { setEditing(true); setFeedback('') }} className="mt-5 min-h-11 bg-char px-5 text-xs uppercase tracking-wider text-ivory hover:bg-dark">Edit profile</button>
     </div> : <form onSubmit={save} noValidate className="space-y-5">
       <Field id="profile-name" label="Full name" error={errors.name}><input id="profile-name" autoComplete="name" required className={inputCls} value={form.name} onChange={set('name')} aria-invalid={!!errors.name} /></Field>
-      <Field id="profile-email" label="Email address" error={errors.email}><input id="profile-email" type="email" autoComplete="email" required className={inputCls} value={form.email} onChange={set('email')} aria-invalid={!!errors.email} /><span className="mt-1 block text-xs text-muted">Your demo sign-in email is not changed by editing this contact field.</span></Field>
+      <Field id="profile-email" label="Email address" error={errors.email}><input id="profile-email" type="email" autoComplete="email" required className={inputCls} value={form.email} onChange={set('email')} aria-invalid={!!errors.email} /><span className="mt-1 block text-xs text-muted">Your sign-in email is not changed by editing this contact field.</span></Field>
       <Field id="profile-phone" label="Phone number (optional)"><input id="profile-phone" type="tel" autoComplete="tel" className={inputCls} value={form.phone || ''} onChange={set('phone')} /></Field>
       <div>
         <p className="mb-1 text-xs uppercase tracking-widest">Profile photo (optional)</p>
         <div className="flex flex-wrap items-center gap-4">
-          {form.image ? <img src={form.image} alt="Profile photo preview" className="h-16 w-16 rounded-full border border-beige object-cover" /> : <span aria-hidden="true" className="grid h-16 w-16 place-items-center rounded-full border border-gold/50 bg-cream font-serif text-2xl text-char">{(form.name || 'C').charAt(0).toUpperCase()}</span>}
+          <CustomerAvatar email={session.email} name={form.name} imageSrc={shownImage || ''} className="h-16 w-16 bg-cream text-2xl text-char" />
           <div className="flex flex-wrap gap-2">
             <label htmlFor="profile-image" className="inline-flex min-h-11 cursor-pointer items-center gap-2 border border-beige px-4 text-xs uppercase tracking-wider transition hover:border-gold">
               <FileUp aria-hidden="true" size={15} />{imageLoading ? 'Preparing photo…' : 'Choose photo'}
             </label>
             <input id="profile-image" type="file" accept="image/jpeg,image/png,image/webp" onChange={selectProfileImage} disabled={imageLoading} className="sr-only" aria-describedby="profile-image-help" />
-            {form.image && <button type="button" onClick={() => { setForm((current) => ({ ...current, image: '' })); setErrors((current) => ({ ...current, image: '' })) }} className="inline-flex min-h-11 items-center gap-2 border border-beige px-4 text-xs uppercase tracking-wider transition hover:border-char"><Trash2 aria-hidden="true" size={14} />Remove</button>}
+            {shownImage && <button type="button" onClick={() => {
+              setSelectedImage(null)
+              setRemoveStoredImage(true)
+              setForm((current) => ({ ...current, image: '', imageId: '' }))
+              setErrors((current) => ({ ...current, image: '' }))
+            }} className="inline-flex min-h-11 items-center gap-2 border border-beige px-4 text-xs uppercase tracking-wider transition hover:border-char"><Trash2 aria-hidden="true" size={14} />Remove</button>}
           </div>
         </div>
-        <p id="profile-image-help" className="mt-2 text-xs text-muted">JPEG, PNG, or WebP · up to 10 MB. Your photo is resized and saved in this browser.</p>
+        <p id="profile-image-help" className="mt-2 text-xs text-muted">JPEG, PNG, or WebP · up to 10 MB. Your resized photo is saved in browser-local image storage and is not shared across devices.</p>
         {errors.image && <p role="alert" className="mt-1 text-xs text-red-700">{errors.image}</p>}
       </div>
       <Field id="profile-image-url" label="Or use a profile image URL (optional)" error={errors.image}>
-        <input id="profile-image-url" type="url" className={inputCls} value={form.image?.startsWith('http') ? form.image : ''} onChange={set('image')} placeholder="https://example.com/portrait.jpg" aria-invalid={!!errors.image} />
+        <input id="profile-image-url" type="url" className={inputCls} value={form.image?.startsWith('http') ? form.image : ''} onChange={setProfileImageUrl} placeholder="https://example.com/portrait.jpg" aria-invalid={!!errors.image} />
       </Field>
       <div className="flex flex-wrap gap-3"><button type="submit" disabled={imageLoading} className="min-h-11 bg-char px-5 text-xs uppercase tracking-wider text-ivory hover:bg-dark disabled:cursor-wait disabled:opacity-60">Save changes</button><button type="button" onClick={cancelEdit} className="min-h-11 border border-beige px-5 text-xs uppercase tracking-wider hover:border-char">Cancel editing</button></div>
     </form>}
@@ -443,7 +514,7 @@ export function Settings() {
   }
 
   function signOut() {
-    if (!window.confirm('Sign out of this demo customer session?')) return
+    if (!window.confirm('Sign out of your customer session?')) return
     try {
       endDemoSession()
       window.location.assign('/')
@@ -464,11 +535,11 @@ export function Settings() {
     </section>
     <section className="mt-10">
       <h2 className="mb-3 font-serif text-xl text-char">Account information</h2>
-      <div className="border-y border-beige"><Detail label="Customer name" value={customer.name} icon={<ImagePlus size={16} />} /><Detail label="Demo sign-in email" value={session.email} icon={<Mail size={16} />} /></div>
-      <p className="mt-3 text-xs leading-5 text-muted">This is a frontend demonstration session, not secure authentication. Account access and password changes require backend authentication.</p>
+      <div className="border-y border-beige"><Detail label="Customer name" value={customer.name} icon={<ImagePlus size={16} />} /><Detail label="Sign-in email" value={session.email} icon={<Mail size={16} />} /></div>
+      <p className="mt-3 text-xs leading-5 text-muted">This frontend-only local account is not secure production authentication and is not shared across browsers or devices. Password changes are not available here.</p>
     </section>
     <section className="mt-10 border-t border-beige pt-6">
-      <h2 className="font-serif text-xl text-char">Sign out</h2><p className="mt-2 text-sm text-muted">End this demo session on this browser.</p>
+      <h2 className="font-serif text-xl text-char">Sign out</h2><p className="mt-2 text-sm text-muted">End your current session on this browser. Your saved profile remains available to sign in again.</p>
       <button type="button" onClick={signOut} className="mt-4 min-h-11 border border-char px-5 text-xs uppercase tracking-wider text-char transition hover:bg-char hover:text-ivory">Sign out</button>
     </section>
   </div>

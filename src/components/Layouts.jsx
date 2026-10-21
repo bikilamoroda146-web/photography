@@ -1,25 +1,99 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, Navigate, useNavigate } from 'react-router-dom'
-import { CalendarDays, LayoutDashboard, LogOut, Menu, Settings, UserRound, X } from 'lucide-react'
+import { ArrowLeft, CalendarDays, LayoutDashboard, LogOut, Menu, Settings, UserRound, X } from 'lucide-react'
 import { NAV, SITE } from '../data/data'
-import { Button } from './ui'
+import CustomerAvatar from './CustomerAvatar'
 import { usePublicServices, usePublicSettings } from '../hooks/usePublicData'
-import { endDemoSession, getCustomer, getDemoSession } from '../services/customerService'
+import { CUSTOMER_SESSION_CHANGED, endDemoSession, getCustomer, getDemoSession } from '../services/customerService'
 
 function Navbar() {
   const [open, setOpen] = useState(false)
+  const [auth, setAuth] = useState(() => {
+    try {
+      return { session: getDemoSession(), error: '' }
+    } catch (error) {
+      return { session: null, error: error.message || 'Customer session could not be read.' }
+    }
+  })
+  const [signOutError, setSignOutError] = useState('')
+  const navigate = useNavigate()
+  const location = useLocation()
   const link = ({ isActive }) => `border-b pb-1 transition ${isActive ? 'border-gold text-gold' : 'border-transparent hover:border-beige'}`
+  useEffect(() => {
+    function refreshSession() {
+      try {
+        setAuth({ session: getDemoSession(), error: '' })
+      } catch (error) {
+        setAuth({ session: null, error: error.message || 'Customer session could not be read.' })
+      }
+    }
+    window.addEventListener(CUSTOMER_SESSION_CHANGED, refreshSession)
+    window.addEventListener('storage', refreshSession)
+    return () => {
+      window.removeEventListener(CUSTOMER_SESSION_CHANGED, refreshSession)
+      window.removeEventListener('storage', refreshSession)
+    }
+  }, [])
+  useEffect(() => {
+    if (!open) return undefined
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') setOpen(false)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [open])
+  useEffect(() => setOpen(false), [location.pathname])
+
+  function signOut() {
+    setSignOutError('')
+    try {
+      endDemoSession()
+      setAuth({ session: null, error: '' })
+      setOpen(false)
+      navigate('/', { replace: true })
+    } catch (error) {
+      setSignOutError(error.message || 'Unable to sign out.')
+    }
+  }
+
+  const desktopAuthLinks = auth.session
+    ? <>
+      <Link to="/dashboard/profile" state={{ editProfile: true }} aria-label="Open your profile editor" className="inline-flex rounded-full transition hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-gold focus-visible:outline-offset-2">
+        <CustomerAvatar email={auth.session.email} name="Customer" className="h-7 w-7 cursor-pointer text-xs" />
+      </Link>
+      <button type="button" onClick={signOut} className="inline-flex items-center gap-2 text-xs uppercase tracking-widest hover:text-gold"><LogOut aria-hidden="true" size={16} />Sign Out</button>
+    </>
+    : <>
+      <Link to="/signin" className="text-xs uppercase tracking-widest hover:text-gold">Sign In</Link>
+      <Link to="/signup" className="text-xs uppercase tracking-widest hover:text-gold">Sign Up</Link>
+      <Link to="/admin/signin" className="text-[10px] uppercase tracking-wider text-beige hover:text-gold">Studio Admin</Link>
+    </>
+
   return (
     <header className="absolute inset-x-0 top-0 z-30 text-ivory">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-5 md:px-10">
-        <Link to="/" className="leading-none"><span className="font-serif text-2xl tracking-widest">SAMI</span><span className="block text-[8px] tracking-[.4em] text-beige">PHOTOGRAPHY</span></Link>
+        <Link to="/" onClick={() => setOpen(false)} className="leading-none"><span className="font-serif text-2xl tracking-widest">SAMI</span><span className="block text-[8px] tracking-[.4em] text-beige">PHOTOGRAPHY</span></Link>
         <nav aria-label="Main" className="hidden gap-8 text-xs uppercase tracking-widest md:flex">
           {NAV.map(([p, l]) => <NavLink key={p} to={p} end className={link}>{l}</NavLink>)}</nav>
-        <div className="hidden items-center gap-5 md:flex"><Link to="/signin" className="text-xs uppercase tracking-widest hover:text-gold">Sign In</Link><Link to="/admin/signin" className="text-[10px] uppercase tracking-wider text-beige hover:text-gold">Studio Admin</Link><Button to="/contact?service=Portrait%20Photography">Book a Session</Button></div>
-        <button type="button" className="-mr-2 p-2 md:hidden" aria-expanded={open} aria-label="Toggle menu" onClick={() => setOpen(!open)}>{open ? <X /> : <Menu />}</button>
+        <div className="hidden items-center gap-5 md:flex">{desktopAuthLinks}</div>
+        <button type="button" className="-mr-2 grid min-h-11 min-w-11 place-items-center p-2 md:hidden" aria-expanded={open} aria-controls="mobile-public-navigation" aria-label={open ? 'Close menu' : 'Open menu'} onClick={() => setOpen(!open)}>{open ? <X /> : <Menu />}</button>
       </div>
-      {open && <div className="fade bg-rich/95 px-5 pb-6 md:hidden">
-        {[...NAV, ['/signin', 'Sign In'], ['/admin/signin', 'Studio Admin']].map(([p, l]) => <Link key={p} to={p} onClick={() => setOpen(false)} className="block border-b border-white/10 py-3 text-sm uppercase tracking-widest">{l}</Link>)}</div>}
+      {open && <div id="mobile-public-navigation" className="fade bg-rich/95 px-5 pb-6 md:hidden">
+        <nav aria-label="Mobile main" className="space-y-1">
+          {NAV.map(([p, l]) => <NavLink key={p} to={p} end onClick={() => setOpen(false)} className={({ isActive }) => `block border-b py-3 text-sm uppercase tracking-widest ${isActive ? 'border-gold text-gold' : 'border-white/10 text-ivory'}`}>{l}</NavLink>)}
+          {auth.session ? <>
+            <Link to="/dashboard/profile" state={{ editProfile: true }} onClick={() => setOpen(false)} aria-label="Open your profile editor" className="flex min-h-11 w-11 items-center justify-center rounded-full border-b border-white/10 py-2 transition hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-gold focus-visible:outline-offset-2">
+              <CustomerAvatar email={auth.session.email} name="Customer" className="h-7 w-7 cursor-pointer text-xs" />
+            </Link>
+            <button type="button" onClick={signOut} className="flex w-full items-center gap-2 border-b border-white/10 py-3 text-left text-sm uppercase tracking-widest"><LogOut aria-hidden="true" size={16} />Sign Out</button>
+          </> : <>
+            <Link to="/signin" onClick={() => setOpen(false)} className="block border-b border-white/10 py-3 text-sm uppercase tracking-widest">Sign In</Link>
+            <Link to="/signup" onClick={() => setOpen(false)} className="block border-b border-white/10 py-3 text-sm uppercase tracking-widest">Sign Up</Link>
+            <Link to="/admin/signin" onClick={() => setOpen(false)} className="block border-b border-white/10 py-3 text-sm uppercase tracking-widest text-beige">Studio Admin</Link>
+          </>}
+        </nav>
+      </div>}
+      {(auth.error || signOutError) && <p role="alert" className="mx-auto max-w-7xl px-5 text-xs text-red-200 md:px-10">{auth.error || signOutError}</p>}
     </header>)
 }
 function Footer() {
@@ -84,7 +158,7 @@ export function DashboardLayout() {
     { to: '/dashboard/settings', label: 'Settings', icon: Settings, end: true },
   ]
   function signOut() {
-    if (!window.confirm('Sign out of this demo customer session?')) return
+    if (!window.confirm('Sign out of your customer session?')) return
     try {
       endDemoSession()
       navigate('/', { replace: true })
@@ -101,7 +175,9 @@ export function DashboardLayout() {
             <button type="button" className="rounded-sm p-1 text-beige hover:text-ivory focus-visible:outline md:hidden" aria-label="Close navigation menu" onClick={() => setOpen(false)}><X size={18} /></button></div>
         </div>
         <div className="border-b border-white/10 px-5 py-5">
-          {customer.image ? <img src={customer.image} alt="" className="h-10 w-10 rounded-full border border-gold/50 object-cover" /> : <span className="grid h-10 w-10 place-items-center rounded-full border border-gold/50 bg-white/5 font-serif text-lg text-gold">{(customer.name || 'C').charAt(0).toUpperCase()}</span>}
+          <Link to="/dashboard/profile" state={{ editProfile: true }} aria-label="Edit your profile and profile photo" className="inline-flex rounded-full transition hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-gold focus-visible:outline-offset-2" onClick={() => setOpen(false)}>
+            <CustomerAvatar email={session.email} name={customer.name} className="h-10 w-10 cursor-pointer text-lg" />
+          </Link>
           <p className="mt-3 truncate text-sm font-medium">{customer.name}</p><p className="mt-1 truncate text-xs text-beige">{session.email}</p>
         </div>
         <nav aria-label="Customer dashboard" className="flex-1 space-y-1 px-3 py-5">
@@ -119,6 +195,7 @@ export function DashboardLayout() {
         </nav>
         <div className="border-t border-white/10 px-3 py-4">
           {error && <p role="alert" className="mb-3 px-3 text-xs text-red-200">{error}</p>}
+          <Link to="/" onClick={() => setOpen(false)} className="flex min-h-11 items-center gap-3 border-l-2 border-transparent px-3 text-sm text-beige transition hover:bg-white/[.04] hover:text-ivory"><ArrowLeft aria-hidden="true" size={17} strokeWidth={1.6} />Back to Website</Link>
           <button type="button" onClick={signOut} className="flex min-h-11 w-full items-center gap-3 border-l-2 border-transparent px-3 text-sm text-beige transition hover:bg-white/[.04] hover:text-ivory"><LogOut aria-hidden="true" size={17} strokeWidth={1.6} />Sign Out</button>
         </div>
       </aside>
@@ -128,10 +205,13 @@ export function DashboardLayout() {
             <button ref={menuButton} type="button" className="grid h-10 w-10 place-items-center border border-beige text-char hover:border-gold md:hidden" aria-label="Open navigation menu" aria-expanded={open} aria-controls="customer-navigation" onClick={() => setOpen(true)}><Menu size={19} /></button>
             <span className="text-[10px] uppercase tracking-[.18em] text-muted">Customer dashboard</span>
           </div>
-          <Link to="/dashboard/profile" className="flex min-h-10 items-center gap-2 text-xs text-char hover:text-gold">{customer.image ? <img src={customer.image} alt="" className="h-8 w-8 rounded-full border border-beige object-cover" /> : <span className="grid h-8 w-8 place-items-center rounded-full border border-beige font-serif">{(customer.name || 'C').charAt(0).toUpperCase()}</span>}<span className="hidden sm:inline">{customer.name}</span></Link>
+          <Link to="/dashboard/profile" state={{ editProfile: true }} aria-label={`Edit profile for ${customer.name}`} className="flex min-h-10 items-center gap-2 rounded-sm text-xs text-char hover:text-gold focus-visible:outline focus-visible:outline-2 focus-visible:outline-gold focus-visible:outline-offset-2">
+            <CustomerAvatar email={session.email} name={customer.name} className="h-8 w-8 text-sm text-char" />
+            <span className="hidden text-right sm:block"><span className="block">{customer.name}</span><span className="block text-[10px] text-muted">{session.email}</span></span>
+          </Link>
         </header>
         <main className="fade mx-auto w-full max-w-[1440px] px-4 py-7 sm:px-7 sm:py-9 lg:px-10 lg:py-10">
-          <p className="mb-7 border-l-2 border-gold bg-cream px-3 py-2 text-xs leading-5 text-muted">Frontend demo only · This account and its bookings are stored in this browser. This is not secure authentication.</p>
+          <p className="mb-7 border-l-2 border-gold bg-cream px-3 py-2 text-xs leading-5 text-muted">Frontend-only local accounts are not secure production authentication. Profiles, password hashes and bookings stay in this browser and are not shared across devices or browsers.</p>
           <Outlet />
         </main>
       </div>

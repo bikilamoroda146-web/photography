@@ -5,7 +5,7 @@ import { PORTFOLIO_CATEGORIES } from '../services/portfolioService'
 export default function Portfolio() {
   const [cat, setCat] = useState('All')
   const [openId, setOpenId] = useState(null)
-  const { projects, error } = usePublicProjects()
+  const { projects, error, loading } = usePublicProjects()
   const { settings, error: settingsError } = usePublicSettings()
   const items = projects.filter((p) => cat === 'All' || p.cat === cat)
   const idx = items.findIndex((p) => p.id === openId)
@@ -24,7 +24,8 @@ export default function Portfolio() {
       {!settings.showPortfolio ? <p className="py-10 text-center text-muted">The portfolio is not currently displayed.</p> : <>
       <div className="mb-10 flex flex-wrap gap-2" role="group" aria-label="Filter by category">{['All', ...PORTFOLIO_CATEGORIES].map((c) => (
         <button type="button" key={c} aria-pressed={cat === c} onClick={() => setCat(c)} className={`border px-4 py-2 text-xs uppercase tracking-widest transition ${cat === c ? 'border-char bg-char text-ivory' : 'border-beige hover:border-gold'}`}>{c}</button>))}</div>
-      <Gallery key={cat} items={items} onOpen={setOpenId} />
+      {loading ? <p role="status" className="py-16 text-center text-sm text-muted">Loading the portfolio…</p>
+        : <Gallery key={cat} items={items} onOpen={setOpenId} />}
       </>}
     </section>
     {cur && <div role="dialog" aria-modal="true" aria-label={cur.title} className="fade fixed inset-0 z-50 flex flex-col items-center justify-center bg-rich/95 p-4">

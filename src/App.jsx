@@ -7,6 +7,7 @@ import Services from './pages/Services'
 import About from './pages/About'
 import Contact from './pages/Contact'
 import SignIn from './pages/SignIn'
+import SignUp from './pages/SignUp'
 import {
   BookingDetails, Bookings, BookSession, Dashboard, Profile, Settings,
 } from './pages/Customer'
@@ -34,6 +35,7 @@ export default function App() {
         <Route path="*" element={<div className="grid min-h-screen place-items-center text-center"><h1 className="font-serif text-4xl">Page not found</h1></div>} />
       </Route>
       <Route path="/signin" element={<SignIn />} />
+      <Route path="/signup" element={<SignUp />} />
       <Route path="/admin/signin" element={<AdminSignIn />} />
       <Route path="/admin" element={<AdminLayout />}>
         <Route index element={<AdminOverview />} />
